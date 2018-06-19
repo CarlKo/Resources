@@ -1,0 +1,419 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"> 
+  <head> 
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/> 
+    <title>Google Maps JavaScript API Example: Advanced Directions</title> 
+    <script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script> 
+    <style type="text/css"> 
+      body {
+        font-family: Verdana, Arial, sans serif;
+        font-size: 11px;
+        margin: 2px;
+      }
+      table.directions {
+        width: 90%;
+      }
+      table.directions th {
+        background-color:#EEEEEE;
+      }
+      img {
+        color: #000000;
+      }
+      input, select {
+        font-family: Verdana, Arial, sans serif;
+        font-size: 11px;
+      }
+    </style> 
+    <script type="text/javascript">
+      var directionDisplay;
+      var directionsService = new google.maps.DirectionsService();
+      var map;
+      var origin = null;
+      var destination = null;
+      var waypoints = [];
+      var markers = [];
+      var directionsVisible = false;
+      var geocoder;
+ 
+      function initialize() {
+        directionsDisplay = new google.maps.DirectionsRenderer();
+        var kaohsiung = new google.maps.LatLng(22.6251075, 120.3089541);
+        var myOptions = {
+          zoom:13,
+          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          center: kaohsiung
+        }
+        map = new google.maps.Map(document.getElementById("map_canvas"), myOptions);
+        directionsDisplay.setMap(map);
+        directionsDisplay.setPanel(document.getElementById("directions_panel"));
+ 
+        geocoder = new google.maps.Geocoder();
+ 
+        google.maps.event.addListener(map, "click", function(event) {
+          if(origin == null) {
+            origin = event.latLng;//.address;
+            addMarker(origin);
+          }
+          else if(destination == null) {
+            destination = event.latLng;
+            addMarker(destination);
+          }
+          else {
+            if(waypoints.length < 9) {
+              waypoints.push({ location: destination, stopover: true });
+              destination = event.latLng;
+              addMarker(destination);
+            } 
+            else {
+              alert("Maximum number of waypoints reached");
+            }
+          }
+        });
+        
+        document.getElementById("from").focus();
+      }
+ 
+      function addMarker(latlng) {        
+        markers.push(new google.maps.Marker({
+          position: latlng, 
+          map: map,
+          icon: "http://maps.google.com/mapfiles/marker" + String.fromCharCode(markers.length + 65) + ".png"
+        }));
+        map.setCenter(latlng);   
+      }
+ 
+      function getLatLng(address) {
+        var latlng;
+        geocoder.geocode( { "address": address}, function(results, status) {
+          if (status == google.maps.GeocoderStatus.OK) {            
+            latlng=results[0].geometry.location;
+          }
+          else {
+            latlng="";
+          }    
+        });
+        return latlng;
+      }
+
+      function getAddress(latlng) {
+        var address;
+        geocoder.geocode({'latLng': latlng}, function(results, status) {
+          if (status == google.maps.GeocoderStatus.OK) {
+            if (results[1]) {
+              address=results[1].formatted_address;
+            }
+            else {
+              address="";
+            }
+          }
+        });   
+      }
+
+      function getDirections() {
+        clearMapInformation();
+        calcRoute();
+      }
+ 
+      function calcRoute() {
+        var address;
+        var latlng;
+ 
+        address = document.getElementById("from").value;
+        if (address == "") {
+          alert("Input one address on the 'From:' to add a start point");
+          return;
+        }
+        origin = addMarker(address);
+ 
+        var spots = document.getElementById("spots");
+        if (typeof spots[0] == "undefined" || typeof spots[0] == null || spots[0] == null) {
+          alert("Input one address on the 'To:' and press [+] to add an end point");
+          return;
+        }
+ 
+        for(var i = 0; i < spots.options.length; i++) {
+          address = spots.options[i].value;
+          if (destination == null) {
+            destination = addMarker(address);
+          }
+          else {
+            waypoints.push({ location: destination, stopover: true });
+            destination = addMarker(address);
+          }
+        }
+ 
+        if (document.getElementById("toorigin").checked) {
+          address = document.getElementById("from").value;
+          waypoints.push({ location: destination, stopover: true });
+          destination = addMarker(address);
+        }
+ 
+        map.setCenter(origin);
+ 
+        var mode;
+        switch (document.getElementById("mode").value) {
+          case "bicycling":
+            mode = google.maps.DirectionsTravelMode.BICYCLING;
+            break;
+          case "driving":
+            mode = google.maps.DirectionsTravelMode.DRIVING;
+            break;
+          case "walking":
+            mode = google.maps.DirectionsTravelMode.WALKING;
+            break;
+        }
+    
+        var request = {
+          origin: origin,
+          destination: destination,
+          waypoints: waypoints,
+          travelMode: mode,
+          optimizeWaypoints: document.getElementById("optimize").checked,
+          avoidHighways: document.getElementById("highways").checked,
+          avoidTolls: document.getElementById("tolls").checked
+        };
+    
+        directionsService.route(request, function(response, status) {
+          if (status == google.maps.DirectionsStatus.OK) {
+            directionsDisplay.setDirections(response);
+          }
+        });
+    
+        clearMarkers();
+        clearWaypoints();
+        directionsVisible = true;
+      }
+ 
+      function updateMode() {
+        if (directionsVisible) {
+          calcRoute();
+        }
+      }
+ 
+      function clearMarkers() {
+        for (var i = 0; i < markers.length; i++) {
+          markers[i].setMap(null);
+        }
+      }
+ 
+      function clearWaypoints() {
+        markers = [];
+        origin = null;
+        destination = null;
+        waypoints = [];
+        directionsVisible = false;
+      }
+ 
+      function clearMapInformation() {
+        directionsDisplay.setMap(null);
+        directionsDisplay.setPanel(null);
+        directionsDisplay = new google.maps.DirectionsRenderer();
+        directionsDisplay.setMap(map);
+        directionsDisplay.setPanel(document.getElementById("directions_panel"));
+      }
+ 
+      function clearCriteria() {
+        document.getElementById("from").value = "";
+        document.getElementById("to").value = "";
+        var obj = document.getElementById("spots");
+        while (obj.options.length != 0) {
+          obj.options[0] = null;
+        }
+        document.getElementById("from").focus();
+      }
+ 
+      function reset() {
+        clearMarkers();
+        clearWaypoints();
+        clearMapInformation();
+        clearCriteria();
+      }
+ 
+      function isEmpty(source) {
+        if (source.value == "" || typeof source == null) {
+          return false;
+        }
+        else {
+          return true;
+        }
+      }
+ 
+      function isExist(source, target) {
+        if (typeof target[0] == "undefined") {
+          if (source.value == target.value) return true;
+        }
+        else {
+          for (i = 0; i < target.length; i++) {
+            if(source.value == target[i].value) return true;
+          }
+        }
+        return false;
+      }
+ 
+      function add(source, target) {
+        if (isEmpty(source)) {
+          if (!isExist(source, target)) {
+            var opt = document.createElement("OPTION");
+            opt.text = source.value;
+            opt.value = source.value;
+            target.add(opt);
+            addMarker(getLatLng(source.value));
+
+            source.value = "";
+          }
+        }
+        document.getElementById("to").focus();        
+      }
+      
+      function remove(target) {
+        flag = 0;
+        do {
+          if (typeof target[0] == "undefined" || typeof target[0] == null || target[0] == null) {
+            if(target.selected) {
+              target.remove(0);
+              return;
+            }
+            return;
+          }
+ 
+          for (i = 0; i < target.length; i++) {
+            if (target[i].selected) {
+              target.remove(i);
+              flag = 1;
+              break;
+            }
+            else {
+              flag = 0;
+            }
+          }
+        } while(flag == 1)
+      }
+ 
+      function movetop() {
+        var target = document.getElementById("spots");
+        if (typeof target[0] == "undefined" || typeof target[0] == null || target[0] == null) {
+          return;
+        }
+        
+        for (i = 0; i < target.length; i++) {
+          if (target[i].selected) {
+            if (i != 0) {
+              target.insertBefore(target[i], target[0]);
+            }
+          }
+        }
+      }
+ 
+      function moveup() {
+        var target = document.getElementById("spots");
+        if (typeof target[0] == "undefined" || typeof target[0] == null || target[0] == null) {
+          return;
+        }
+        
+        for (i = 0; i < target.length; i++) {
+          if (target[i].selected) {
+            if (i != 0) {
+              target.insertBefore(target[i], target[i - 1]);
+            }
+          }
+        }
+      }
+ 
+      function movedown() {
+        var target = document.getElementById("spots");
+        if (typeof target[0] == "undefined" || typeof target[0] == null || target[0] == null) {
+          return;
+        }
+ 
+        for (i = target.length - 1; i >= 0 ; i--) {
+          if (target[i].selected) {
+            if (i != target.length) {
+              target.insertBefore(target[i], target[i + 2]);
+            }
+          }
+        }
+      }
+ 
+      function movebottom() {
+        var target = document.getElementById("spots");
+        if (typeof target[0] == "undefined" || typeof target[0] == null || target[0] == null) {
+          return;
+        }
+ 
+        for (i = target.length - 1; i >= 0 ; i--) {
+          if (target[i].selected) {
+            if (i != target.length) {
+              target.insertBefore(target[i], target[target.length]);
+            }
+          }
+        }
+      }
+    </script> 
+  </head>
+  <body onload="initialize()"> 
+    <table>
+      <tr>
+        <th align="right">From:&nbsp;</th>
+        <td colspan="3">
+          <input type="text" size="50" id="from" name="from" value="" />
+        </td>
+      </tr>
+      <tr> 
+        <th align="right">To:&nbsp;</th> 
+        <td>
+          <input type="text" size="50" id="to" name="to" value="" />
+        </td>
+        <td colspan="2">
+          <a href="javascript:add(to, spots)"><img src="images/add.gif" style="width:16px;height:16px;border:0px;" alt="add" /></a>
+        </td>
+      </tr>
+      <tr>
+        <th align="right">&nbsp;</th> 
+        <td align="right">
+          <select id="spots" name="spots" size="10" multiple style="width: 350px;"></select>
+        </td>
+        <td valign="top">
+          <a href="javascript:remove(spots)"><img src="images/delete.gif" style="width:16px;height:16px;border:0px;" alt="delete" /></a><br><br><br>
+          <a href="javascript:movetop()"><img src="images/movetop.gif" style="width:16px;height:16px;border:0px;" alt="move top" /></a><br>
+          <a href="javascript:moveup()"><img src="images/moveup.gif" style="width:16px;height:16px;border:0px;" alt="move up" /></a><br>
+          <a href="javascript:movedown()"><img src="images/movedown.gif" style="width:16px;height:16px;border:0px;" alt="move down" /></a><br>
+          <a href="javascript:movebottom()"><img src="images/movebottom.gif" style="width:16px;height:16px;border:0px;" alt="move bottom" /></a>
+        </td>
+        <td>
+          <input type="checkbox" id="optimize" checked />Optimize
+          <select id="mode" onchange="updateMode()">
+            <option value="driving">Driving</option>
+            <option value="bicycling">Bicycling</option>
+            <option value="walking">Walking</option>
+          </select><br>
+          <input type="checkbox" id="highways" checked />Avoid highways<br>
+          <input type="checkbox" id="tolls" checked />Avoid tolls<br>
+          <input type="checkbox" id="toorigin" />Return to origin
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" align="right"> 
+          <input type="button" value="Reset" onclick="reset()" /> 
+        </td>
+        <td colspan="2"> 
+          <input type="button" value="Get Directions!" onclick="calcRoute()" /> 
+        </td>
+      </tr> 
+    </table> 
+    <table class="directions"> 
+      <tr>
+        <th style="width: 30%;">Formatted Directions</th>
+        <th style="width: 50%;">Map</th>
+      </tr> 
+      <tr> 
+        <td valign="top">
+          <div id="directions_panel" style="height: 310px; overflow-y:scroll;"></div>
+        </td> 
+        <td valign="top">
+          <div id="map_canvas" style="height: 320px;"></div>
+        </td>
+      </tr> 
+    </table> 
+  </body> 
+</html>
+
